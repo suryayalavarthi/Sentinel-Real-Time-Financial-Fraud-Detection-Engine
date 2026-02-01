@@ -1,0 +1,9 @@
+data/
+ieee-fraud-detection/
+*.csv
+*.pkl
+__pycache__/
+.pytest_cache/
+.DS_Store
+reports/
+tests/

@@ -1,0 +1,10 @@
+{
+  "training_date": "2026-01-31T07:38:27.892944",
+  "n_samples": 590540,
+  "n_features": 436,
+  "fraud_rate": 0.03499000914417313,
+  "avg_roc_auc": 0.8781136761413417,
+  "avg_pr_auc": 0.4843535834207162,
+  "estimated_roi": 1209.558312269866,
+  "model_version": "1.0.0"
+}
