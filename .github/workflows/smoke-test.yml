@@ -26,26 +26,30 @@ jobs:
       - name: Wait for API Readiness
         run: |
           echo "Waiting for XGBoost model to load into memory..."
-          # Retries curl every 5s for up to 60s to account for resource-constrained starts
           timeout 60s bash -c 'until curl -s localhost:8000/health; do sleep 5; done' || (docker compose logs && exit 1)
 
       - name: Run Inference Smoke Test
         run: |
-          # The payload below is now a dictionary to satisfy the API's Pydantic schema
+          # Sending the exact keys the API logs are asking for
           RESPONSE=$(curl -s -X POST http://localhost:8000/predict \
             -H "Content-Type: application/json" \
             -d '{
               "features": {
-                "f1": 0.5, 
-                "f2": 1.2, 
-                "f3": 0.3, 
-                "f4": 4.4
+                "TransactionAmt": 50.0,
+                "ProductCD": "W",
+                "card1": 1000,
+                "card2": 500,
+                "card3": 150,
+                "card4": "visa",
+                "card5": 226,
+                "card6": "debit",
+                "addr1": 315,
+                "addr2": 87
               }
             }') 
           
           echo "API Response: $RESPONSE"
           
-          # Check if the response contains the expected output key
           if [[ $RESPONSE == *"fraud_probability"* ]]; then
             echo "Smoke test passed!"
           else
