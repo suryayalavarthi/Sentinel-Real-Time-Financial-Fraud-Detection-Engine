@@ -1,22 +1,51 @@
 name: Sentinel Smoke Test
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Build Sentinel API
-        run: docker-compose build
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Sentinel Services
+        run: docker compose build
 
       - name: Start Services
-        run: docker-compose up -d
+        run: docker compose up -d
 
-      - name: Run Smoke Test
+      - name: Wait for API Readiness
         run: |
-          # Wait for API to be ready
-          sleep 10
-          # Run a curl command to verify 200 OK and latency
-          curl -f http://localhost:8000/predict -d '{"data": [...]}'
+          echo "Waiting for XGBoost model to load into memory..."
+          # Retries curl every 5s for up to 60s to account for resource-constrained starts
+          timeout 60s bash -c 'until curl -s localhost:8000/health; do sleep 5; done' || (docker compose logs && exit 1)
+
+      - name: Run Inference Smoke Test
+        run: |
+          # Sending a sample transaction to verify 6-8ms performance window
+          RESPONSE=$(curl -s -X POST http://localhost:8000/predict \
+            -H "Content-Type: application/json" \
+            -d '{"data": [[0.5, 1.2, 0.3, 4.4]]}') # Adjust this array to match your feature count
+          
+          echo "API Response: $RESPONSE"
+          
+          # Verify the response contains a fraud probability
+          if [[ $RESPONSE == *"fraud_probability"* ]]; then
+            echo "Smoke test passed!"
+          else
+            echo "Smoke test failed: Unexpected response format"
+            exit 1
+          fi
+
+      - name: Stop Services
+        if: always()
+        run: docker compose down
