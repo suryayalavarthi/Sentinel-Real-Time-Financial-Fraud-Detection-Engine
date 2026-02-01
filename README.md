@@ -307,6 +307,8 @@ seaborn>=0.11.0
 
 - [x] **Model Training**: XGBoost with time-series CV ✅
 - [x] **Business Metrics**: Custom loss function and ROI analysis ✅
+- [x] **API Deployment**: FastAPI endpoint with Docker containerization ✅
+- [x] **Model Monitoring**: PSI/KL-Divergence drift detection sidecar ✅
 - [ ] **Model Explainability**: SHAP values for feature importance
 - [ ] **Parallel Processing**: Use `dask` for multi-core groupby operations
 - [ ] **GPU Acceleration**: Implement with `cuDF` (RAPIDS)
@@ -314,9 +316,7 @@ seaborn>=0.11.0
   - Geographic velocity (distance between transactions)
   - Hour-of-day transaction patterns
   - Device fingerprint frequency
-- [ ] **API Deployment**: FastAPI endpoint with Docker containerization
-- [ ] **Model Monitoring**: Drift detection and automated retraining
-
+  
 ## 📖 References
 
 - **Dataset**: [IEEE-CIS Fraud Detection (Kaggle)](https://www.kaggle.com/c/ieee-fraud-detection)
