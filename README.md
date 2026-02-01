@@ -1,4 +1,9 @@
 # 🛡️ Sentinel - High-Frequency Fraud Detection System
+![Build Status](https://github.com/suryayalavarthi/Sentinel-Real-Time-Financial-Fraud-Detection-Engine/actions/workflows/smoke-test.yml/badge.svg)
+![Python Version](https://img.shields.io/badge/python-3.8%2B-blue)
+![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=flat&logo=fastapi)
+![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=flat&logo=docker&logoColor=white)
+![License](https://img.shields.io/badge/license-MIT-green)
 
 A production-grade engine achieving 6-8ms inference latency and 99.9% fraud capture, optimized for resource-constrained environments.
 
