@@ -1,10 +1,3 @@
-"""
-Sentinel - High-Frequency Fraud Detection System
-Data Ingestion & Memory Optimization Pipeline
-Purpose: Process IEEE-CIS Fraud Detection dataset under strict memory constraints
-Constraints: Optimized for containerized environments with limited RAM
-"""
-
 import gc
 import pandas as pd
 import numpy as np
@@ -16,20 +9,14 @@ warnings.filterwarnings('ignore')
 
 def reduce_mem_usage(df: pd.DataFrame, verbose: bool = True) -> pd.DataFrame:
     """
-    Optimize DataFrame memory usage by aggressively downcasting types.
-    
-    Engineering Logic:
-    - Object → category for low-cardinality columns
-    - Signed int → unsigned int when values are non-negative
-    - Nullable integer types for columns with nulls
-    - Float64 → float32, and sparse floats for high-NaN columns
-    
+    Reduce memory footprint via dtype downcasting.
+
     Args:
-        df: Input DataFrame
-        verbose: Print memory reduction statistics
-    
+        df: Input DataFrame.
+        verbose: Whether to print memory reduction stats.
+
     Returns:
-        Memory-optimized DataFrame
+        Memory-optimized DataFrame.
     """
     start_mem = df.memory_usage(deep=True).sum() / 1024**2
     n_rows = len(df)
@@ -38,7 +25,7 @@ def reduce_mem_usage(df: pd.DataFrame, verbose: bool = True) -> pd.DataFrame:
         series = df[col]
         col_type = series.dtype
         
-        # Object to category for low-cardinality columns
+        # Enforce categorical compression for low-cardinality text
         if col_type == object:
             unique_count = series.nunique(dropna=False)
             if n_rows > 0 and unique_count / n_rows < 0.5:
@@ -54,10 +41,10 @@ def reduce_mem_usage(df: pd.DataFrame, verbose: bool = True) -> pd.DataFrame:
         c_max = series.max(skipna=True)
         has_nulls = series.isna().any()
         
-        # Integer type optimization
+        # Enforce compact integer storage for memory budget
         if pd.api.types.is_integer_dtype(col_type):
             if has_nulls:
-                # Nullable integer types preserve NaNs
+                # Preserve missingness while minimizing memory
                 if c_min >= 0:
                     if c_max < np.iinfo(np.uint8).max:
                         df[col] = series.astype('UInt8')
@@ -77,7 +64,7 @@ def reduce_mem_usage(df: pd.DataFrame, verbose: bool = True) -> pd.DataFrame:
                     else:
                         df[col] = series.astype('Int64')
             else:
-                # Standard integer downcasting with unsigned optimization
+                # Prefer unsigned ranges when valid to reduce footprint
                 if c_min >= 0:
                     if c_max < np.iinfo(np.uint8).max:
                         df[col] = series.astype(np.uint8, copy=False)
@@ -98,10 +85,10 @@ def reduce_mem_usage(df: pd.DataFrame, verbose: bool = True) -> pd.DataFrame:
                         df[col] = series.astype(np.int64, copy=False)
             continue
         
-        # Float type optimization
+        # Enforce compact float storage for memory budget
         if pd.api.types.is_float_dtype(col_type):
             df[col] = series.astype(np.float32, copy=False)
-            # Use sparse representation for high-NaN columns
+            # Use sparse storage to protect RAM on high-null columns
             if null_ratio >= 0.7:
                 df[col] = pd.arrays.SparseArray(df[col], fill_value=np.nan)
             continue
@@ -123,32 +110,22 @@ def load_and_optimize_data(
     test_identity_path: str
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
-    Load, optimize, and merge IEEE-CIS Fraud Detection dataset.
-    
-    Engineering Workflow:
-    1. Load raw CSV files
-    2. Immediate memory optimization (minimize peak RAM)
-    3. Explicit garbage collection between steps
-    4. LEFT JOIN on TransactionID (preserve all transactions)
-    5. Chronological sorting (prevent data leakage)
-    
+    Load, optimize, and merge IEEE-CIS Fraud Detection datasets.
+
     Args:
-        train_transaction_path: Path to train_transaction.csv
-        train_identity_path: Path to train_identity.csv
-        test_transaction_path: Path to test_transaction.csv
-        test_identity_path: Path to test_identity.csv
-    
+        train_transaction_path: Path to train transaction CSV.
+        train_identity_path: Path to train identity CSV.
+        test_transaction_path: Path to test transaction CSV.
+        test_identity_path: Path to test identity CSV.
+
     Returns:
-        Tuple of (train_df, test_df)
+        Tuple of (train_df, test_df).
     """
-    
     print("=" * 80)
     print("SENTINEL FRAUD DETECTION - DATA INGESTION PIPELINE")
     print("=" * 80)
     
-    # ========================================================================
-    # STEP 1: Load Training Transaction Data
-    # ========================================================================
+    # Enforce deterministic ingestion order for reproducibility
     print("\n[1/6] Loading train_transaction.csv...")
     try:
         train_transaction = pd.read_csv(train_transaction_path)
@@ -159,14 +136,12 @@ def load_and_optimize_data(
     except Exception as e:
         raise Exception(f"Error loading training transactions: {str(e)}")
     
-    # Optimize immediately to minimize peak memory
+    # Enforce memory budget immediately after load
     print("  → Optimizing memory...")
     train_transaction = reduce_mem_usage(train_transaction, verbose=True)
     gc.collect()
     
-    # ========================================================================
-    # STEP 2: Load Training Identity Data
-    # ========================================================================
+    # Preserve identity coverage without inflating peak RAM
     print("\n[2/6] Loading train_identity.csv...")
     try:
         train_identity = pd.read_csv(train_identity_path)
@@ -181,9 +156,7 @@ def load_and_optimize_data(
     train_identity = reduce_mem_usage(train_identity, verbose=True)
     gc.collect()
     
-    # ========================================================================
-    # STEP 3: Merge Training Data (LEFT JOIN)
-    # ========================================================================
+    # Preserve base population via left join for fraud coverage
     print("\n[3/6] Merging training datasets...")
     print("  → Strategy: LEFT JOIN on TransactionID")
     print("  → Rationale: Preserve ALL transactions (base population)")
@@ -200,13 +173,11 @@ def load_and_optimize_data(
     print(f"✓ Merged shape: {train_df.shape}")
     print(f"  Transactions retained: {train_df.shape[0]:,} / {train_transaction.shape[0]:,}")
     
-    # Free memory
+    # Enforce memory budget via explicit cleanup
     del train_transaction, train_identity
     gc.collect()
     
-    # ========================================================================
-    # STEP 4: Load Test Transaction Data
-    # ========================================================================
+    # Stage test ingestion with the same memory discipline
     print("\n[4/6] Loading test_transaction.csv...")
     try:
         test_transaction = pd.read_csv(test_transaction_path)
@@ -221,9 +192,7 @@ def load_and_optimize_data(
     test_transaction = reduce_mem_usage(test_transaction, verbose=True)
     gc.collect()
     
-    # ========================================================================
-    # STEP 5: Load Test Identity Data
-    # ========================================================================
+    # Preserve identity coverage while controlling memory
     print("\n[5/6] Loading test_identity.csv...")
     try:
         test_identity = pd.read_csv(test_identity_path)
@@ -238,9 +207,7 @@ def load_and_optimize_data(
     test_identity = reduce_mem_usage(test_identity, verbose=True)
     gc.collect()
     
-    # ========================================================================
-    # STEP 6: Merge Test Data (LEFT JOIN)
-    # ========================================================================
+    # Preserve base population via left join for evaluation parity
     print("\n[6/6] Merging test datasets...")
     test_df = test_transaction.merge(
         test_identity,
@@ -250,13 +217,11 @@ def load_and_optimize_data(
     
     print(f"✓ Merged shape: {test_df.shape}")
     
-    # Free memory
+    # Enforce memory budget via explicit cleanup
     del test_transaction, test_identity
     gc.collect()
     
-    # ========================================================================
-    # CRITICAL: Chronological Sorting (Prevent Data Leakage)
-    # ========================================================================
+    # Enforce time-series integrity to prevent leakage
     print("\n[CRITICAL] Sorting training data chronologically...")
     print("  → Sorting by TransactionDT (time delta from reference point)")
     print("  → Purpose: Prevent FUTURE DATA LEAKAGE in time-series CV")
@@ -264,9 +229,7 @@ def load_and_optimize_data(
     
     train_df = train_df.sort_values('TransactionDT').reset_index(drop=True)
     
-    # ========================================================================
-    # Final Report
-    # ========================================================================
+    # Emit ingestion summary for auditability
     print("\n" + "=" * 80)
     print("INGESTION COMPLETE - FINAL SUMMARY")
     print("=" * 80)
@@ -287,7 +250,7 @@ def load_and_optimize_data(
 
 
 if __name__ == "__main__":
-    # Configuration
+    # Centralize pipeline configuration
     RAW_DATA_DIR = "./data/ieee-fraud-detection/"
     PROCESSED_DATA_DIR = "./data/"
     
@@ -296,7 +259,7 @@ if __name__ == "__main__":
     TEST_TRANSACTION = f"{RAW_DATA_DIR}test_transaction.csv"
     TEST_IDENTITY = f"{RAW_DATA_DIR}test_identity.csv"
     
-    # Execute pipeline
+    # Execute ingestion pipeline
     train_df, test_df = load_and_optimize_data(
         TRAIN_TRANSACTION,
         TRAIN_IDENTITY,
@@ -304,7 +267,7 @@ if __name__ == "__main__":
         TEST_IDENTITY
     )
     
-    # Optional: Save optimized datasets
+    # Persist optimized datasets for reuse
     print("\n[OPTIONAL] Saving optimized datasets...")
     train_df.to_pickle(f"{PROCESSED_DATA_DIR}train_optimized.pkl")
     test_df.to_pickle(f"{PROCESSED_DATA_DIR}test_optimized.pkl")

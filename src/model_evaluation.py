@@ -1,9 +1,3 @@
-"""
-Sentinel - Model Evaluation & Visualization
-Generate comprehensive evaluation reports and visualizations
-Purpose: Analyze model performance and create publication-ready plots
-"""
-
 import json
 from typing import Dict, List
 
@@ -19,7 +13,7 @@ from sklearn.metrics import (
     roc_curve
 )
 
-# Set style
+# Enforce consistent reporting visuals for stakeholder review
 sns.set_style("whitegrid")
 plt.rcParams['figure.figsize'] = (12, 8)
 plt.rcParams['font.size'] = 10
@@ -74,7 +68,7 @@ def plot_precision_recall_curve(y_true: np.ndarray, y_pred_proba: np.ndarray, sa
     plt.plot(recall, precision, color='blue', lw=2, 
              label=f'PR Curve (AUC = {pr_auc:.4f})')
     
-    # Baseline (random classifier)
+    # Anchor comparison to naive precision baseline
     baseline = y_true.sum() / len(y_true)
     plt.axhline(y=baseline, color='navy', linestyle='--', lw=2,
                 label=f'Random Classifier (Precision = {baseline:.4f})')
@@ -115,7 +109,7 @@ def plot_confusion_matrix(y_true: np.ndarray, y_pred: np.ndarray, save_path: str
     plt.xlabel('Predicted Label', fontsize=12)
     plt.title('Confusion Matrix', fontsize=14, fontweight='bold')
     
-    # Add percentages
+    # Enforce percentage readability for stakeholders
     total = cm.sum()
     for i in range(2):
         for j in range(2):
@@ -171,16 +165,16 @@ def plot_threshold_analysis(y_true: np.ndarray, y_pred_proba: np.ndarray, save_p
     """
     precision, recall, thresholds = precision_recall_curve(y_true, y_pred_proba)
     
-    # Calculate F1 score for each threshold
+    # Enforce balanced scorecard for threshold selection
     f1_scores = 2 * (precision * recall) / (precision + recall + 1e-10)
     
-    # Find optimal threshold (max F1)
+    # Select threshold that balances precision/recall
     optimal_idx = np.argmax(f1_scores)
     optimal_threshold = thresholds[optimal_idx] if optimal_idx < len(thresholds) else 0.5
     
     plt.figure(figsize=(12, 6))
     
-    # Adjust arrays to match threshold length
+    # Align arrays to ensure stable plotting
     precision = precision[:-1]
     recall = recall[:-1]
     f1_scores = f1_scores[:-1]
@@ -225,22 +219,22 @@ def generate_evaluation_report(model_path: str, data_path: str, output_dir: str 
     print("SENTINEL MODEL EVALUATION REPORT")
     print("=" * 80)
     
-    # Load model
+    # Enforce artifact loading for evaluation
     print("\n[1/6] Loading model...")
     model = joblib.load(model_path)
     print(f"✓ Loaded: {model_path}")
     
-    # Load data
+    # Enforce evaluation data loading
     print("\n[2/6] Loading evaluation data...")
     df = pd.read_pickle(data_path)
     print(f"✓ Loaded: {data_path}")
     print(f"  Shape: {df.shape}")
     
-    # Prepare features
+    # Enforce feature alignment with training schema
     from model_training import prepare_features_and_target
     X, y = prepare_features_and_target(df)
     
-    # Load feature names
+    # Enforce feature list consistency for reporting
     feature_names_path = model_path.replace('.pkl', '').replace('model', 'feature_names') + '.json'
     try:
         with open('./models/feature_names.json') as f:
@@ -248,12 +242,12 @@ def generate_evaluation_report(model_path: str, data_path: str, output_dir: str 
     except:
         feature_names = X.columns.tolist()
     
-    # Predictions
+    # Enforce probability scoring for evaluation
     print("\n[3/6] Generating predictions...")
     y_pred_proba = model.predict_proba(X)[:, 1]
     y_pred = (y_pred_proba >= 0.5).astype(int)
     
-    # Generate plots
+    # Emit plots for stakeholder review
     print("\n[4/6] Generating visualizations...")
     
     plot_roc_curve(y, y_pred_proba, f"{output_dir}/roc_curve.png")
@@ -262,7 +256,7 @@ def generate_evaluation_report(model_path: str, data_path: str, output_dir: str 
     plot_feature_importance(model, feature_names, top_n=20, save_path=f"{output_dir}/feature_importance.png")
     optimal_threshold = plot_threshold_analysis(y, y_pred_proba, f"{output_dir}/threshold_analysis.png")
     
-    # Generate metrics report
+    # Emit metrics for governance review
     print("\n[5/6] Calculating metrics...")
     
     from sklearn.metrics import classification_report, roc_auc_score
@@ -273,7 +267,7 @@ def generate_evaluation_report(model_path: str, data_path: str, output_dir: str 
         'classification_report': classification_report(y, y_pred, target_names=['Legitimate', 'Fraud'])
     }
     
-    # Save report
+    # Persist evaluation artifacts
     print("\n[6/6] Saving evaluation report...")
     
     report_path = f"{output_dir}/evaluation_report.txt"
@@ -319,7 +313,7 @@ def generate_evaluation_report(model_path: str, data_path: str, output_dir: str 
 
 
 if __name__ == "__main__":
-    # Check if matplotlib is installed
+    # Enforce plotting dependency presence
     try:
         import matplotlib
         import seaborn
@@ -329,7 +323,7 @@ if __name__ == "__main__":
         print("  pip install matplotlib seaborn")
         exit(1)
     
-    # Generate evaluation report
+    # Execute end-to-end evaluation workflow
     generate_evaluation_report(
         model_path="./models/sentinel_fraud_model.pkl",
         data_path="./data/train_engineered.pkl",

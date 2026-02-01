@@ -1,14 +1,4 @@
-"""
-Sentinel Pipeline Architecture Visualization
-
-This module provides a visual representation of the data flow
-through the Sentinel fraud detection pipeline.
-"""
-
-
 def print_pipeline_architecture():
-    """Print ASCII diagram of the Sentinel pipeline."""
-    
     diagram = """
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║                    SENTINEL FRAUD DETECTION PIPELINE                         ║

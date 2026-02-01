@@ -1,10 +1,3 @@
-"""
-Sentinel - Feature Engineering Pipeline
-Velocity & Behavioral Features for Fraud Detection
-Purpose: Memory-efficient feature engineering for large-scale transaction data
-Constraints: Optimized for datasets with 1M+ rows under memory constraints
-"""
-
 import gc
 import time
 import pandas as pd
@@ -49,7 +42,7 @@ def reduce_mem_usage(df: pd.DataFrame, float_downcast: bool = True) -> pd.DataFr
             c_min = df[col].min()
             c_max = df[col].max()
             
-            # Integer optimization
+            # Enforce compact integer storage for memory budget
             if str(col_type)[:3] == 'int':
                 if c_min > np.iinfo(np.int8).min and c_max < np.iinfo(np.int8).max:
                     df[col] = df[col].astype(np.int8)
@@ -58,7 +51,7 @@ def reduce_mem_usage(df: pd.DataFrame, float_downcast: bool = True) -> pd.DataFr
                 elif c_min > np.iinfo(np.int32).min and c_max < np.iinfo(np.int32).max:
                     df[col] = df[col].astype(np.int32)
             
-            # Float optimization
+            # Enforce compact float storage for memory budget
             elif float_downcast and str(col_type)[:5] == 'float':
                 df[col] = df[col].astype(np.float32)
     
@@ -87,8 +80,7 @@ def create_uid(df: pd.DataFrame) -> pd.DataFrame:
     """
     print("\n[1/5] Creating Unique Identifier (uid)...")
     
-    # Handle NaN values by converting to string 'nan'
-    # This ensures consistent grouping behavior
+    # Standardize UID components to preserve grouping fidelity
     df['uid'] = (
         df['card1'].astype(str) + '_' +
         df['addr1'].astype(str) + '_' +
@@ -122,26 +114,17 @@ def engineer_velocity_features(df: pd.DataFrame) -> pd.DataFrame:
     """
     print("\n[2/5] Engineering Velocity Features...")
     
-    # Verify sorting (critical for rolling windows)
+    # Enforce chronological sorting for rolling windows
     if not df['TransactionDT'].is_monotonic_increasing:
         print("  ⚠ WARNING: Data not sorted by TransactionDT. Sorting now...")
         df = df.sort_values('TransactionDT').reset_index(drop=True)
     
-    # ========================================================================
-    # Feature A: 24-Hour Transaction Frequency per UID
-    # ========================================================================
+    # Enforce velocity signal to capture bursty fraud behavior
     print("  → Feature A: 24h transaction frequency per uid...")
-    
-    # Strategy: For each uid, count transactions in rolling 24h window
-    # Challenge: rolling() expects integer window, not time-based
-    # Solution: Use merge_asof for time-based lookback
-    
-    # Create helper column for 24h lookback timestamp
+
+    # Anchor rolling lookback to preserve time-series integrity
     df['_lookback_24h'] = df['TransactionDT'] - 86400
-    
-    # For each transaction, count how many transactions from same uid
-    # occurred in the [TransactionDT - 86400, TransactionDT] window
-    
+
     def count_transactions_24h(group):
         """Count transactions in 24h window for each row in group."""
         result = []
@@ -150,7 +133,6 @@ def engineer_velocity_features(df: pd.DataFrame) -> pd.DataFrame:
         start_time = time.perf_counter()
         
         for i, current_time in enumerate(times):
-            # Count transactions in [current_time - 86400, current_time]
             window_start = current_time - 86400
             count = np.sum((times >= window_start) & (times <= current_time))
             result.append(count)
@@ -165,23 +147,21 @@ def engineer_velocity_features(df: pd.DataFrame) -> pd.DataFrame:
         
         return pd.Series(result, index=group.index)
     
-    # Apply per uid group (vectorized within each group)
+    # Enforce per-uid aggregation to preserve behavioral signal
     df['uid_TransactionFreq_24h'] = df.groupby('uid', group_keys=False).apply(
         count_transactions_24h
     )
     
     print(f"    ✓ Mean 24h frequency: {df['uid_TransactionFreq_24h'].mean():.2f}")
     
-    # Clean up temporary column
+    # Reclaim temporary columns to protect memory budget
     df.drop('_lookback_24h', axis=1, inplace=True)
     gc.collect()
-    
-    # ========================================================================
-    # Feature B: 30-Day Rolling Mean Transaction Amount per UID
-    # ========================================================================
+
+    # Enforce long-horizon baseline to capture spending shifts
     print("  → Feature B: 30-day rolling mean transaction amount...")
-    
-    # Create helper column for 30d lookback
+
+    # Anchor rolling lookback to preserve time-series integrity
     df['_lookback_30d'] = df['TransactionDT'] - 2592000
     
     def rolling_mean_30d(group):
@@ -194,11 +174,9 @@ def engineer_velocity_features(df: pd.DataFrame) -> pd.DataFrame:
         
         for i, current_time in enumerate(times):
             window_start = current_time - 2592000
-            # Get amounts in window
             mask = (times >= window_start) & (times <= current_time)
             window_amounts = amounts[mask]
-            
-            # Calculate mean (handle empty windows)
+
             if len(window_amounts) > 0:
                 result.append(np.mean(window_amounts))
             else:
@@ -220,11 +198,11 @@ def engineer_velocity_features(df: pd.DataFrame) -> pd.DataFrame:
     
     print(f"    ✓ Mean 30d avg amount: ${df['uid_TransactionAmt_mean_30d'].mean():.2f}")
     
-    # Clean up
+    # Reclaim temporary columns to protect memory budget
     df.drop('_lookback_30d', axis=1, inplace=True)
     gc.collect()
-    
-    # Downcast new features to save memory
+
+    # Enforce compact feature storage for memory budget
     df['uid_TransactionFreq_24h'] = df['uid_TransactionFreq_24h'].astype(np.int16)
     df['uid_TransactionAmt_mean_30d'] = df['uid_TransactionAmt_mean_30d'].astype(np.float32)
     
@@ -250,22 +228,16 @@ def engineer_divergence_features(df: pd.DataFrame) -> pd.DataFrame:
     """
     print("\n[3/5] Engineering Divergence Features...")
     
-    # ========================================================================
-    # Amount to Mean Ratio
-    # ========================================================================
+    # Enforce deviation signal to surface anomalous spend
     print("  → Creating Amt_to_Mean_Ratio...")
-    
-    # Safe division: handle division by zero and NaN
+
     df['Amt_to_Mean_Ratio'] = df['TransactionAmt'] / df['uid_TransactionAmt_mean_30d']
-    
-    # Handle edge cases:
-    # 1. Division by zero → inf
-    # 2. No historical data → NaN
-    # Solution: Replace with 1.0 (neutral signal)
+
+    # Normalize missing or infinite ratios to a neutral baseline
     df['Amt_to_Mean_Ratio'] = df['Amt_to_Mean_Ratio'].replace([np.inf, -np.inf], np.nan)
     df['Amt_to_Mean_Ratio'] = df['Amt_to_Mean_Ratio'].fillna(1.0)
-    
-    # Downcast
+
+    # Enforce compact storage for downstream scoring
     df['Amt_to_Mean_Ratio'] = df['Amt_to_Mean_Ratio'].astype(np.float32)
     
     print(f"    ✓ Mean ratio: {df['Amt_to_Mean_Ratio'].mean():.2f}")
@@ -299,15 +271,14 @@ def engineer_frequency_encoding(df: pd.DataFrame) -> pd.DataFrame:
     for col in categorical_cols:
         if col in df.columns:
             print(f"  → Encoding {col}...")
-            
-            # Calculate frequency (count) for each value
+
+            # Encode rarity to strengthen fraud signal
             freq_map = df[col].value_counts().to_dict()
-            
-            # Map frequencies back to dataframe
+
             new_col_name = f'{col}_freq'
             df[new_col_name] = df[col].map(freq_map)
-            
-            # Handle NaN (unmapped values)
+
+            # Normalize missing values for model stability
             df[new_col_name] = df[new_col_name].fillna(0).astype(np.int32)
             
             print(f"    ✓ Unique values: {df[col].nunique():,}")
@@ -329,12 +300,8 @@ def optimize_final_dataframe(df: pd.DataFrame) -> pd.DataFrame:
         Optimized DataFrame
     """
     print("\n[5/5] Final Memory Optimization...")
-    
-    # Drop temporary uid column (can be recreated if needed)
-    # Keep it if you need it for further feature engineering
-    # df.drop('uid', axis=1, inplace=True)
-    
-    # Apply global memory reduction
+
+    # Enforce global memory budget before persistence
     df = reduce_mem_usage(df, float_downcast=True)
     
     gc.collect()
@@ -363,7 +330,7 @@ def run_feature_engineering_pipeline(df: pd.DataFrame) -> pd.DataFrame:
     print("SENTINEL - FEATURE ENGINEERING PIPELINE")
     print("=" * 80)
     
-    # Validate required columns
+    # Enforce required schema for production features
     required_cols = ['TransactionDT', 'TransactionAmt', 'card1', 'addr1', 'D1']
     missing_cols = [col for col in required_cols if col not in df.columns]
     
@@ -373,7 +340,7 @@ def run_feature_engineering_pipeline(df: pd.DataFrame) -> pd.DataFrame:
     print(f"\nInput Shape: {df.shape}")
     check_memory_usage(df, "Initial")
     
-    # Ensure chronological sorting (CRITICAL for velocity features)
+    # Enforce time-series integrity for velocity features
     print("\n[Pre-Processing] Ensuring chronological order...")
     if not df['TransactionDT'].is_monotonic_increasing:
         df = df.sort_values('TransactionDT').reset_index(drop=True)
@@ -381,14 +348,14 @@ def run_feature_engineering_pipeline(df: pd.DataFrame) -> pd.DataFrame:
     else:
         print("  ✓ Already sorted")
     
-    # Execute pipeline
+    # Execute Sentinel feature pipeline stages
     df = create_uid(df)
     df = engineer_velocity_features(df)
     df = engineer_divergence_features(df)
     df = engineer_frequency_encoding(df)
     df = optimize_final_dataframe(df)
     
-    # Final summary
+    # Emit pipeline summary for auditability
     print("\n" + "=" * 80)
     print("FEATURE ENGINEERING COMPLETE")
     print("=" * 80)
@@ -403,14 +370,14 @@ def run_feature_engineering_pipeline(df: pd.DataFrame) -> pd.DataFrame:
 
 
 if __name__ == "__main__":
-    # Example usage
+    # Signal module usage for local runs
     print("\n[INFO] This is a module script. Import and use run_feature_engineering_pipeline()")
     print("\nExample:")
     print("  from feature_engineering import run_feature_engineering_pipeline")
     print("  train_df = pd.read_pickle(\1../data/processed/train_optimized.pkl')")
     print("  train_df = run_feature_engineering_pipeline(train_df)")
     
-    # Demonstration with sample data
+    # Enable local demo for validation
     print("\n[DEMO] Creating sample dataset for demonstration...")
     
     np.random.seed(42)
@@ -427,7 +394,7 @@ if __name__ == "__main__":
     
     print(f"\nSample data created: {sample_df.shape}")
     
-    # Run pipeline on sample
+    # Execute pipeline on sample data
     sample_df = run_feature_engineering_pipeline(sample_df)
     
     print("\n[DEMO] Sample output:")

@@ -1,8 +1,3 @@
-"""
-Quick Pipeline Execution for Phase 1 Operationalization
-Runs data ingestion, feature engineering, and model training with reduced dataset
-"""
-
 import pandas as pd
 import numpy as np
 from data_ingestion import load_and_optimize_data
@@ -14,15 +9,14 @@ print("\n" + "=" * 80)
 print("PHASE 1: QUICK PIPELINE EXECUTION")
 print("=" * 80)
 
-# Create directories
+# Enforce artifact directories for quick run outputs
 os.makedirs("./models", exist_ok=True)
 os.makedirs("./reports", exist_ok=True)
 os.makedirs("./logs", exist_ok=True)
 
-# Step 1: Data Ingestion (sample for speed)
+# Enforce fast ingestion path for quick validation
 print("\n[1/3] Data Ingestion (Sampling for speed)...")
 try:
-    # Load full data
     train_df, test_df = load_and_optimize_data(
         train_transaction_path="./data/train_transaction.csv",
         train_identity_path="./data/train_identity.csv",
@@ -30,12 +24,12 @@ try:
         test_identity_path="./data/test_identity.csv"
     )
     
-    # Sample for quick execution (50K rows)
+    # Enforce bounded sample to reduce runtime
     print(f"  Original size: {len(train_df):,} rows")
     train_df = train_df.sample(n=min(50000, len(train_df)), random_state=42)
     print(f"  Sampled to: {len(train_df):,} rows for quick execution")
     
-    # Save
+    # Persist sampled artifacts for downstream steps
     train_df.to_pickle("./data/train_optimized.pkl")
     test_df.to_pickle("./data/test_optimized.pkl")
     print("  ✓ Data ingestion complete")
@@ -44,7 +38,7 @@ except Exception as e:
     print(f"  ✗ Error: {e}")
     raise
 
-# Step 2: Feature Engineering
+# Enforce feature engineering on sampled data
 print("\n[2/3] Feature Engineering...")
 try:
     train_df = run_feature_engineering_pipeline(train_df)
@@ -54,13 +48,12 @@ except Exception as e:
     print(f"  ✗ Error: {e}")
     raise
 
-# Step 3: Model Training
+# Enforce lightweight training for quick signal check
 print("\n[3/3] Model Training (Quick)...")
 try:
-    # Train with 3 folds for speed
+    # Use fewer splits to bound runtime
     best_model, fold_metrics = run_time_series_cross_validation(train_df, n_splits=3)
-    
-    # Train final model
+
     final_model = train_final_model(train_df)
     
     print("  ✓ Model training complete")

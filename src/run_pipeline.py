@@ -1,11 +1,3 @@
-"""
-Sentinel - Complete Pipeline Integration Example
-Demonstrates end-to-end workflow from data ingestion to feature engineering
-
-Usage:
-    python run_pipeline.py
-"""
-
 import pandas as pd
 import gc
 from data_ingestion import load_and_optimize_data
@@ -19,9 +11,7 @@ def main():
     print("SENTINEL FRAUD DETECTION - COMPLETE PIPELINE")
     print("=" * 80)
     
-    # ========================================================================
-    # STAGE 1: Data Ingestion & Memory Optimization
-    # ========================================================================
+    # Enforce ingestion-first ordering for reproducibility
     print("\n[STAGE 1] DATA INGESTION")
     print("-" * 80)
     
@@ -45,9 +35,7 @@ def main():
         print("\nDownload from: https://www.kaggle.com/c/ieee-fraud-detection/data")
         return
     
-    # ========================================================================
-    # STAGE 2: Feature Engineering
-    # ========================================================================
+    # Enforce feature engineering after ingestion
     print("\n[STAGE 2] FEATURE ENGINEERING - TRAINING SET")
     print("-" * 80)
     
@@ -58,9 +46,7 @@ def main():
     
     test_df = run_feature_engineering_pipeline(test_df)
     
-    # ========================================================================
-    # STAGE 3: Save Processed Data
-    # ========================================================================
+    # Persist engineered data for downstream training and monitoring
     print("\n[STAGE 3] SAVING PROCESSED DATA")
     print("-" * 80)
     
@@ -72,14 +58,12 @@ def main():
     test_df.to_pickle(f"{PROCESSED_DATA_DIR}test_engineered.pkl")
     print(f"  ✓ Saved: {PROCESSED_DATA_DIR}test_engineered.pkl")
     
-    # Optional: Save as CSV for inspection (warning: larger file size)
+    # Emit lightweight sample for manual review
     print("\nOptional: Saving sample as CSV for inspection...")
     train_df.head(1000).to_csv(f"{PROCESSED_DATA_DIR}train_sample.csv", index=False)
     print(f"  ✓ Saved: {PROCESSED_DATA_DIR}train_sample.csv (first 1000 rows)")
     
-    # ========================================================================
-    # STAGE 4: Summary Report
-    # ========================================================================
+    # Emit pipeline summary for auditability
     print("\n" + "=" * 80)
     print("PIPELINE COMPLETE - SUMMARY REPORT")
     print("=" * 80)
@@ -123,7 +107,7 @@ def main():
     print("✓ ALL STAGES COMPLETED SUCCESSFULLY")
     print("=" * 80 + "\n")
     
-    # Cleanup
+    # Enforce memory hygiene before exit
     gc.collect()
 
 

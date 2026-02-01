@@ -1,10 +1,3 @@
-"""
-Sentinel - Production Monitoring & Drift Detection
-Monitor model performance and detect feature/concept drift
-Purpose: Ensure model reliability in production through continuous monitoring
-Metrics: PSI, KL Divergence, performance degradation detection
-"""
-
 import json
 import warnings
 from pathlib import Path
@@ -27,15 +20,6 @@ if str(SRC_PATH) not in sys.path:
 
 
 class SentinelMonitor:
-    """
-    Production monitoring system for Sentinel fraud detection model.
-    
-    Engineering Design:
-    - Tracks feature drift using PSI and KL Divergence
-    - Monitors model performance degradation
-    - Generates JSON logs for alerting systems
-    - Supports batch and real-time monitoring
-    """
     
     def __init__(
         self,
@@ -55,17 +39,17 @@ class SentinelMonitor:
         print("SENTINEL PRODUCTION MONITORING - INITIALIZATION")
         print("=" * 80)
         
-        # Load model
+        # Enforce model artifact loading before monitoring
         print(f"\n[1/3] Loading model from {model_path}...")
         self.model = joblib.load(model_path)
         print("✓ Model loaded")
         
-        # Load reference data
+        # Enforce reference baseline for drift detection
         print(f"\n[2/3] Loading reference data from {reference_data_path}...")
         self.reference_df = pd.read_pickle(reference_data_path)
         print(f"✓ Reference data loaded: {self.reference_df.shape}")
         
-        # Load metadata
+        # Enforce metadata loading for governance reporting
         print(f"\n[3/3] Loading metadata from {metadata_path}...")
         with open(metadata_path) as f:
             self.metadata = json.load(f)
@@ -75,7 +59,7 @@ class SentinelMonitor:
         print(f"  Training Date: {self.metadata.get('training_date', 'N/A')}")
         print(f"  Baseline ROC-AUC: {self.metadata.get('avg_roc_auc', 'N/A')}")
         
-        # Prepare reference features
+        # Enforce feature preparation for baseline metrics
         from model_training import prepare_features_and_target
         self.X_ref, self.y_ref = prepare_features_and_target(self.reference_df)
         
@@ -118,32 +102,32 @@ class SentinelMonitor:
         Returns:
             PSI value
         """
-        # Remove NaN values
+        # Enforce clean distributions before drift math
         reference = reference[~np.isnan(reference)]
         production = production[~np.isnan(production)]
         
-        # Create bins based on reference data
+        # Enforce reference-anchored binning for PSI
         _, bin_edges = np.histogram(reference, bins=bins)
         
-        # Ensure bins cover both distributions
+        # Enforce full coverage across reference and production
         min_val = min(reference.min(), production.min())
         max_val = max(reference.max(), production.max())
         bin_edges[0] = min_val - 1e-6
         bin_edges[-1] = max_val + 1e-6
         
-        # Calculate distributions
+        # Enforce distribution counts per bin
         ref_counts, _ = np.histogram(reference, bins=bin_edges)
         prod_counts, _ = np.histogram(production, bins=bin_edges)
         
-        # Convert to percentages
+        # Normalize to probabilities for PSI
         ref_percents = ref_counts / len(reference)
         prod_percents = prod_counts / len(production)
         
-        # Avoid division by zero
+        # Guard against zero divisions in PSI
         ref_percents = np.where(ref_percents == 0, 0.0001, ref_percents)
         prod_percents = np.where(prod_percents == 0, 0.0001, prod_percents)
         
-        # Calculate PSI
+        # Compute PSI for drift signal
         psi = np.sum((prod_percents - ref_percents) * np.log(prod_percents / ref_percents))
         
         return float(psi)
@@ -173,11 +157,11 @@ class SentinelMonitor:
         Returns:
             KL Divergence value
         """
-        # Remove NaN
+        # Enforce clean distributions before KL math
         reference = reference[~np.isnan(reference)]
         production = production[~np.isnan(production)]
         
-        # Create bins
+        # Enforce reference-anchored binning for KL
         _, bin_edges = np.histogram(reference, bins=bins)
         
         min_val = min(reference.min(), production.min())
@@ -185,19 +169,19 @@ class SentinelMonitor:
         bin_edges[0] = min_val - 1e-6
         bin_edges[-1] = max_val + 1e-6
         
-        # Calculate distributions
+        # Enforce distribution counts per bin
         ref_counts, _ = np.histogram(reference, bins=bin_edges)
         prod_counts, _ = np.histogram(production, bins=bin_edges)
         
-        # Convert to probabilities
+        # Normalize to probabilities for KL
         ref_probs = ref_counts / len(reference)
         prod_probs = prod_counts / len(production)
         
-        # Avoid log(0)
+        # Guard against log(0) instability
         ref_probs = np.where(ref_probs == 0, 1e-10, ref_probs)
         prod_probs = np.where(prod_probs == 0, 1e-10, prod_probs)
         
-        # Calculate KL Divergence
+        # Compute KL divergence for distribution shift
         kl_div = np.sum(prod_probs * np.log(prod_probs / ref_probs))
         
         return float(kl_div)
@@ -226,12 +210,12 @@ class SentinelMonitor:
         print("FEATURE DRIFT DETECTION")
         print("=" * 80)
         
-        # Prepare production features
+        # Enforce production feature preparation
         from model_training import prepare_features_and_target
         X_prod, _ = prepare_features_and_target(production_df)
         X_prod = self._encode_for_model(X_prod)
         
-        # Default: Monitor all numerical features
+        # Enforce default monitoring scope for key risk features
         if features_to_monitor is None:
             features_to_monitor = [
                 'TransactionAmt',
@@ -259,21 +243,21 @@ class SentinelMonitor:
             if feature not in self.X_ref.columns or feature not in X_prod.columns:
                 continue
             
-            # Get distributions
+            # Enforce distribution extraction for drift math
             ref_values = self.X_ref[feature].values
             prod_values = X_prod[feature].values
             
-            # Calculate metrics
+            # Compute drift metrics per feature
             psi = self.calculate_psi(ref_values, prod_values)
             kl_div = self.calculate_kl_divergence(ref_values, prod_values)
             
-            # Detect drift
+            # Enforce drift thresholding
             drift = psi >= psi_threshold or kl_div >= kl_threshold
             
             if drift:
                 drift_results['drift_detected'] = True
             
-            # Store results
+            # Persist per-feature drift results
             drift_results['features'][feature] = {
                 'psi': float(psi),
                 'kl_divergence': float(kl_div),
@@ -282,7 +266,7 @@ class SentinelMonitor:
                 'kl_threshold': kl_threshold
             }
             
-            # Print results
+            # Emit drift diagnostics for auditability
             drift_status = "⚠ DRIFT" if drift else "✓ OK"
             print(f"{feature:<30} {psi:<10.4f} {kl_div:<10.4f} {drift_status:<10}")
         
@@ -326,12 +310,12 @@ class SentinelMonitor:
         print("PERFORMANCE EVALUATION")
         print("=" * 80)
         
-        # Prepare features
+        # Enforce production feature preparation for scoring
         from model_training import prepare_features_and_target
         X_prod, y_prod = prepare_features_and_target(production_df)
         X_prod = self._encode_for_model(X_prod)
         
-        # Predictions
+        # Enforce probability scoring for performance metrics
         print("\nGenerating predictions...")
         booster = self.model.get_booster()
         expected_features = booster.feature_names or list(X_prod.columns)
@@ -340,19 +324,19 @@ class SentinelMonitor:
         y_pred_proba = booster.predict(dmatrix)
         y_pred = (y_pred_proba >= threshold).astype(int)
         
-        # Calculate metrics
+        # Compute performance metrics for governance
         print("Calculating metrics...")
         
         roc_auc = roc_auc_score(y_prod, y_pred_proba)
         precision = precision_score(y_prod, y_pred, zero_division=0)
         recall = recall_score(y_prod, y_pred, zero_division=0)
         
-        # Compare to baseline
+        # Compare against baseline for degradation detection
         baseline_roc_auc = self.metadata.get('avg_roc_auc', 0.92)
         roc_auc_delta = roc_auc - baseline_roc_auc
         
-        # Detect performance degradation
-        degradation_threshold = 0.05  # 5% drop
+        # Enforce degradation thresholding for alerts
+        degradation_threshold = 0.05
         performance_degraded = roc_auc_delta < -degradation_threshold
         
         results = {
@@ -367,7 +351,7 @@ class SentinelMonitor:
             'performance_degraded': bool(performance_degraded)
         }
         
-        # Print results
+        # Emit performance diagnostics for auditability
         print("\n" + "-" * 80)
         print("PERFORMANCE METRICS")
         print("-" * 80)
@@ -410,10 +394,10 @@ class SentinelMonitor:
         print("GENERATING MONITORING REPORT")
         print("=" * 80)
         
-        # Detect drift
+        # Detect feature drift for alerting
         drift_results = self.detect_feature_drift(production_df)
         
-        # Evaluate performance (if labels available)
+        # Evaluate performance when labels are available
         if 'isFraud' in production_df.columns:
             performance_results = self.evaluate_performance(production_df)
         else:
@@ -421,7 +405,7 @@ class SentinelMonitor:
                 'note': 'Ground truth labels not available'
             }
         
-        # Compile report
+        # Compile monitoring report for downstream systems
         report = {
             'report_timestamp': datetime.now().isoformat(),
             'model_version': self.metadata.get('model_version', 'N/A'),
@@ -431,7 +415,7 @@ class SentinelMonitor:
             'alerts': []
         }
         
-        # Generate alerts
+        # Generate alerts for ops response
         if drift_results['drift_detected']:
             report['alerts'].append({
                 'type': 'FEATURE_DRIFT',
@@ -448,7 +432,7 @@ class SentinelMonitor:
                 'action': 'Retrain model immediately'
             })
         
-        # Save report
+        # Persist report for audit trail
         import os
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         
@@ -457,7 +441,7 @@ class SentinelMonitor:
         
         print(f"\n✓ Report saved: {output_path}")
         
-        # Print summary
+        # Emit summary for console visibility
         print("\n" + "=" * 80)
         print("MONITORING REPORT SUMMARY")
         print("=" * 80)
@@ -495,18 +479,18 @@ def simulate_production_batch(
     Returns:
         Simulated production batch
     """
-    # Sample from reference data
+    # Sample baseline to simulate production batches
     production_batch = reference_df.sample(n=batch_size, replace=True).copy()
     
-    # Simulate drift
+    # Inject drift patterns for monitoring validation
     if drift_simulation == 'moderate':
-        # Increase transaction amounts by 20%
+        # Inflate amounts to simulate moderate drift
         production_batch['TransactionAmt'] *= 1.2
         
     elif drift_simulation == 'severe':
-        # Increase transaction amounts by 50%
+        # Inflate amounts to simulate severe drift
         production_batch['TransactionAmt'] *= 1.5
-        # Change fraud rate
+        # Shift fraud rate to simulate label drift
         production_batch['isFraud'] = np.random.choice([0, 1], batch_size, p=[0.90, 0.10])
     
     return production_batch
@@ -519,17 +503,17 @@ def main():
     print("SENTINEL PRODUCTION MONITORING - DEMO")
     print("=" * 80)
     
-    # Initialize monitor
+    # Initialize monitoring system
     monitor = SentinelMonitor(
         model_path="./models/sentinel_fraud_model.pkl",
         reference_data_path="./data/processed/train_engineered.pkl",
         metadata_path="./models/model_metadata.json"
     )
     
-    # Load reference data for simulation
+    # Load baseline data for simulation
     reference_df = pd.read_pickle("./data/processed/train_engineered.pkl")
     
-    # Scenario 1: No drift
+    # Execute no-drift scenario
     print("\n" + "=" * 80)
     print("SCENARIO 1: Normal Production Data (No Drift)")
     print("=" * 80)
@@ -537,7 +521,7 @@ def main():
     normal_batch = simulate_production_batch(reference_df, batch_size=1000, drift_simulation='none')
     report1 = monitor.generate_monitoring_report(normal_batch, "./logs/monitoring_report_normal.json")
     
-    # Scenario 2: Moderate drift
+    # Execute moderate-drift scenario
     print("\n" + "=" * 80)
     print("SCENARIO 2: Production Data with Moderate Drift")
     print("=" * 80)
@@ -545,7 +529,7 @@ def main():
     drift_batch = simulate_production_batch(reference_df, batch_size=1000, drift_simulation='moderate')
     report2 = monitor.generate_monitoring_report(drift_batch, "./logs/monitoring_report_drift.json")
     
-    # Scenario 3: Severe drift
+    # Execute severe-drift scenario
     print("\n" + "=" * 80)
     print("SCENARIO 3: Production Data with Severe Drift")
     print("=" * 80)

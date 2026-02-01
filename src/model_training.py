@@ -1,10 +1,3 @@
-"""
-Sentinel - Fraud Detection Model Training
-Production-Grade XGBoost Training with Time-Series Validation
-Purpose: Train fraud detection model with business-aware loss functions
-Constraints: Severe class imbalance (1:1000), time-series data integrity
-"""
-
 import gc
 import json
 import warnings
@@ -26,37 +19,7 @@ from sklearn.model_selection import TimeSeriesSplit
 warnings.filterwarnings('ignore')
 
 
-# ============================================================================
-# TIME-SERIES VALIDATION STRATEGY - CRITICAL DESIGN DECISION
-# ============================================================================
-"""
-WHY TimeSeriesSplit INSTEAD OF Standard K-Fold Shuffle:
-
-1. TEMPORAL INTEGRITY:
-   - Financial transactions have inherent time-ordering
-   - Future transactions may depend on past patterns (e.g., velocity features)
-   - Standard K-Fold shuffle would randomly mix past and future data
-
-2. DATA LEAKAGE PREVENTION:
-   - Our engineered features (uid_TransactionFreq_24h, uid_TransactionAmt_mean_30d)
-     are calculated using historical data
-   - Training on "future" data and validating on "past" data would leak information
-   - This creates artificially inflated performance metrics
-
-3. LOOK-AHEAD BIAS:
-   - In production, the model only has access to PAST data
-   - TimeSeriesSplit ensures training set always precedes validation set
-   - This simulates real-world deployment conditions
-
-4. BUSINESS IMPACT:
-   - Models trained with shuffle-based CV often fail in production
-   - TimeSeriesSplit provides realistic performance estimates
-   - Prevents costly model retraining after deployment
-
-Example:
-   Standard K-Fold:  [Train: Jan+Mar+May | Val: Feb+Apr]  ❌ WRONG
-   TimeSeriesSplit:  [Train: Jan-Mar | Val: Apr-May]      ✅ CORRECT
-"""
+# Enforce time-series validation to prevent leakage and deployment drift
 
 
 def calculate_business_loss(
@@ -117,8 +80,8 @@ def calculate_roi(
     
     additional_savings = model_savings - baseline_savings
     
-    # Assume model deployment cost (infrastructure, maintenance)
-    deployment_cost = 10000.0  # Annual cost
+    # Set deployment cost for ROI estimation
+    deployment_cost = 10000.0
     
     roi = ((additional_savings - deployment_cost) / deployment_cost) * 100
     
@@ -150,23 +113,22 @@ def prepare_features_and_target(
     if drop_cols is None:
         drop_cols = []
     
-    # Default columns to drop
+    # Enforce removal of non-feature columns
     default_drop = [
         target_col,
         'TransactionID',
-        'TransactionDT',  # Keep for sorting, drop for training
-        'uid'  # Identifier, not a feature
+        'TransactionDT',
+        'uid'
     ]
     
     all_drop_cols = list(set(default_drop + drop_cols))
     
-    # Remove columns that don't exist
+    # Guard against missing columns in mixed schemas
     existing_drop_cols = [col for col in all_drop_cols if col in df.columns]
     
     X = df.drop(columns=existing_drop_cols, errors='ignore')
     
-    # Ensure categorical features are handled by XGBoost
-    # XGBoost requires pandas 'category' dtype with enable_categorical=True
+    # Enforce categorical encoding for XGBoost compatibility
     object_cols = X.select_dtypes(include=['object']).columns
     for col in object_cols:
         X[col] = X[col].astype('category')
@@ -201,7 +163,7 @@ def train_xgboost_model(
     Returns:
         Trained XGBoost model
     """
-    # Calculate scale_pos_weight if not provided
+    # Enforce class-imbalance correction when unspecified
     if scale_pos_weight is None:
         neg_count = (y_train == 0).sum()
         pos_count = (y_train == 1).sum()
@@ -209,11 +171,11 @@ def train_xgboost_model(
     
     print(f"  → scale_pos_weight: {scale_pos_weight:.2f}")
     
-    # XGBoost hyperparameters
+    # Enforce production-tuned hyperparameters for stability
     params = {
         'max_depth': 6,
         'learning_rate': 0.1,
-        'n_estimators': 300,  # Reduced for faster training
+        'n_estimators': 300,
         'objective': 'binary:logistic',
         'eval_metric': 'auc',
         'enable_categorical': True,
@@ -226,13 +188,13 @@ def train_xgboost_model(
         'reg_lambda': 1,
         'random_state': 42,
         'n_jobs': -1,
-        'tree_method': 'hist',  # Faster training
-        'early_stopping_rounds': 50  # Built into params for newer XGBoost
+        'tree_method': 'hist',
+        'early_stopping_rounds': 50
     }
     
     model = xgb.XGBClassifier(**params)
     
-    # Train model (early stopping handled by params)
+    # Enforce validation-based early stopping
     model.fit(
         X_train,
         y_train,
@@ -261,26 +223,26 @@ def evaluate_model(
     Returns:
         Dictionary of evaluation metrics
     """
-    # Predict probabilities
+    # Enforce probability scoring for risk ranking
     y_pred_proba = model.predict_proba(X_val)[:, 1]
     
-    # Predict labels
+    # Enforce thresholded decisions for business metrics
     y_pred = (y_pred_proba >= threshold).astype(int)
     
-    # ROC-AUC
+    # Enforce ranking quality metric
     roc_auc = roc_auc_score(y_val, y_pred_proba)
     
-    # Precision-Recall AUC
+    # Enforce fraud-focused precision-recall assessment
     precision, recall, _ = precision_recall_curve(y_val, y_pred_proba)
     pr_auc = auc(recall, precision)
     
-    # Confusion Matrix
+    # Enforce error breakdown for business costs
     tn, fp, fn, tp = confusion_matrix(y_val, y_pred).ravel()
     
-    # Business Loss
+    # Enforce cost-aware loss accounting
     business_loss = calculate_business_loss(y_val, y_pred)
     
-    # Metrics
+    # Consolidate metrics for reporting
     metrics = {
         'roc_auc': roc_auc,
         'pr_auc': pr_auc,
@@ -314,14 +276,14 @@ def run_time_series_cross_validation(
     print("TIME-SERIES CROSS-VALIDATION")
     print("=" * 80)
     
-    # Prepare features and target
+    # Enforce feature/target preparation for CV
     X, y = prepare_features_and_target(df)
     
     print(f"\nDataset Shape: {X.shape}")
     print(f"Fraud Rate: {y.mean() * 100:.4f}%")
     print(f"Class Imbalance Ratio: 1:{int(1/y.mean())}")
     
-    # Time-series split
+    # Enforce time-series splits to prevent leakage
     tscv = TimeSeriesSplit(n_splits=n_splits)
     
     fold_metrics = []
@@ -332,32 +294,32 @@ def run_time_series_cross_validation(
     print("-" * 80)
     
     for fold, (train_idx, val_idx) in enumerate(tscv.split(X), 1):
-        # Split data
+        # Enforce fold partitioning by time order
         X_train, X_val = X.iloc[train_idx], X.iloc[val_idx]
         y_train, y_val = y.iloc[train_idx], y.iloc[val_idx]
         
-        # Train model
+        # Enforce fold training to validate temporal performance
         model = train_xgboost_model(X_train, y_train, X_val, y_val)
         
-        # Evaluate
+        # Enforce fold evaluation for business metrics
         metrics = evaluate_model(model, X_val, y_val)
         metrics['fold'] = fold
         fold_metrics.append(metrics)
         
-        # Print fold results
+        # Emit fold diagnostics for auditability
         print(f"{fold:<6} {metrics['roc_auc']:<10.4f} {metrics['pr_auc']:<10.4f} "
               f"{metrics['precision']:<12.4f} {metrics['recall']:<10.4f} "
               f"${metrics['business_loss']:<14,.2f}")
         
-        # Track best model
+        # Select deployment candidate by best ROC-AUC
         if metrics['roc_auc'] > best_roc_auc:
             best_roc_auc = metrics['roc_auc']
             best_model = model
         
-        # Memory cleanup
+        # Enforce memory budget between folds
         gc.collect()
     
-    # Calculate average metrics
+    # Aggregate metrics for governance reporting
     print("-" * 80)
     avg_roc_auc = np.mean([m['roc_auc'] for m in fold_metrics])
     avg_pr_auc = np.mean([m['pr_auc'] for m in fold_metrics])
@@ -388,7 +350,7 @@ def train_final_model(df: pd.DataFrame) -> xgb.XGBClassifier:
     
     X, y = prepare_features_and_target(df)
     
-    # Calculate scale_pos_weight
+    # Enforce class-imbalance correction on full data
     neg_count = (y == 0).sum()
     pos_count = (y == 1).sum()
     scale_pos_weight = neg_count / pos_count
@@ -399,11 +361,11 @@ def train_final_model(df: pd.DataFrame) -> xgb.XGBClassifier:
     print(f"Legitimate transactions: {neg_count:,}")
     print(f"Scale pos weight: {scale_pos_weight:.2f}")
     
-    # Final model parameters
+    # Enforce production hyperparameters for final fit
     params = {
         'max_depth': 6,
         'learning_rate': 0.1,
-        'n_estimators': 300,  # Slightly fewer for full dataset
+        'n_estimators': 300,
         'objective': 'binary:logistic',
         'eval_metric': 'auc',
         'enable_categorical': True,
@@ -443,12 +405,12 @@ def calculate_model_roi(fold_metrics: List[Dict[str, float]]) -> Dict[str, float
     Returns:
         ROI metrics dictionary
     """
-    # Average recall across folds (fraud capture rate)
+    # Anchor ROI on observed fraud capture rate
     avg_recall = np.mean([m['recall'] for m in fold_metrics])
     
-    # Business assumptions
+    # Apply business priors for ROI estimation
     baseline_capture_rate = 0.50
-    model_capture_rate = min(avg_recall, 0.75)  # Cap at 75%
+    model_capture_rate = min(avg_recall, 0.75)
     
     roi_metrics = calculate_roi(
         baseline_fraud_captured=baseline_capture_rate,
@@ -467,9 +429,7 @@ def main():
     print("SENTINEL FRAUD DETECTION - MODEL TRAINING PIPELINE")
     print("=" * 80)
     
-    # ========================================================================
-    # STAGE 1: Load Data
-    # ========================================================================
+    # Enforce data load before training stages
     print("\n[STAGE 1] LOADING DATA")
     print("-" * 80)
     
@@ -486,22 +446,18 @@ def main():
         print("  python run_pipeline.py")
         return
     
-    # Verify required columns
+    # Enforce required schema for training
     if 'isFraud' not in df.columns:
         print("\n⚠ ERROR: Target column 'isFraud' not found")
         return
     
-    # ========================================================================
-    # STAGE 2: Time-Series Cross-Validation
-    # ========================================================================
+    # Enforce time-series cross-validation for realistic metrics
     print("\n[STAGE 2] TIME-SERIES CROSS-VALIDATION")
     print("-" * 80)
     
     best_model, fold_metrics = run_time_series_cross_validation(df, n_splits=5)
     
-    # ========================================================================
-    # STAGE 3: ROI Analysis
-    # ========================================================================
+    # Enforce ROI analysis for business alignment
     print("\n[STAGE 3] ROI ANALYSIS")
     print("-" * 80)
     
@@ -513,31 +469,27 @@ def main():
     print(f"Annual Deployment Cost:      ${roi_metrics['deployment_cost']:,.2f}")
     print(f"Estimated ROI:               {roi_metrics['roi_percentage']:.2f}%")
     
-    # ========================================================================
-    # STAGE 4: Train Final Model
-    # ========================================================================
+    # Enforce final model training on full dataset
     print("\n[STAGE 4] FINAL MODEL TRAINING")
     print("-" * 80)
     
     final_model = train_final_model(df)
     
-    # ========================================================================
-    # STAGE 5: Model Serialization
-    # ========================================================================
+    # Enforce artifact serialization for deployment
     print("\n[STAGE 5] MODEL SERIALIZATION")
     print("-" * 80)
     
-    # Save as JSON (XGBoost native format)
+    # Persist model for cross-runtime loading
     json_path = "./models/sentinel_fraud_model.json"
     final_model.save_model(json_path)
     print(f"✓ Saved model: {json_path}")
     
-    # Save as pickle (for Python compatibility)
+    # Persist model for Python runtime usage
     pkl_path = "./models/sentinel_fraud_model.pkl"
     joblib.dump(final_model, pkl_path)
     print(f"✓ Saved model: {pkl_path}")
     
-    # Save feature names
+    # Persist feature schema for inference alignment
     X, _ = prepare_features_and_target(df)
     feature_names = X.columns.tolist()
     
@@ -546,7 +498,7 @@ def main():
         json.dump(feature_names, f, indent=2)
     print(f"✓ Saved feature names: {feature_path}")
     
-    # Save training metadata
+    # Persist training metadata for auditability
     metadata = {
         'training_date': pd.Timestamp.now().isoformat(),
         'n_samples': len(df),
@@ -563,9 +515,7 @@ def main():
         json.dump(metadata, f, indent=2)
     print(f"✓ Saved metadata: {metadata_path}")
     
-    # ========================================================================
-    # FINAL SUMMARY
-    # ========================================================================
+    # Emit final summary for governance
     print("\n" + "=" * 80)
     print("TRAINING COMPLETE - SUMMARY")
     print("=" * 80)
@@ -596,9 +546,9 @@ def main():
 
 
 if __name__ == "__main__":
-    # Create models directory if it doesn't exist
+    # Ensure artifact directory exists
     import os
     os.makedirs("./models", exist_ok=True)
     
-    # Run pipeline
+    # Execute training pipeline
     main()

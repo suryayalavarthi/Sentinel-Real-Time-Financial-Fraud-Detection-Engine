@@ -1,10 +1,3 @@
-"""
-Sentinel - Model Interpretability with SHAP
-Explain fraud detection decisions using SHapley Additive exPlanations
-Purpose: Provide transparent, actionable explanations for model predictions
-Constraints: Memory-efficient SHAP computation using background sampling
-"""
-
 import json
 import warnings
 from typing import Dict, List, Optional, Tuple
@@ -19,21 +12,9 @@ warnings.filterwarnings('ignore')
 
 
 class SentinelExplainer:
-    """
-    SHAP-based explainer for Sentinel fraud detection model.
-    
-    Engineering Design:
-    - Uses TreeExplainer (optimized for XGBoost)
-    - Background dataset sampling (100-500 rows) for memory efficiency
-    - Caches explainer to avoid recomputation
-    """
 
     @staticmethod
     def _encode_for_shap(df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Convert categorical/object columns into numeric codes for SHAP.
-        SHAP expects numeric arrays and will error on object dtypes.
-        """
         encoded = df.copy()
         for col in encoded.columns:
             if pd.api.types.is_categorical_dtype(encoded[col]):
@@ -60,22 +41,22 @@ class SentinelExplainer:
         print("SENTINEL MODEL INTERPRETABILITY - SHAP INITIALIZATION")
         print("=" * 80)
         
-        # Load model
+        # Enforce artifact loading before explanation
         print(f"\n[1/4] Loading model from {model_path}...")
         self.model = joblib.load(model_path)
         print("✓ Model loaded")
         
-        # Load data
+        # Enforce reference data loading for explanations
         print(f"\n[2/4] Loading data from {data_path}...")
         df = pd.read_pickle(data_path)
         print(f"✓ Data loaded: {df.shape}")
         
-        # Prepare features
+        # Enforce feature/target preparation for SHAP inputs
         print("\n[3/4] Preparing features...")
         from model_training import prepare_features_and_target
         self.X, self.y = prepare_features_and_target(df)
         
-        # Load feature names
+        # Enforce feature alignment with training artifacts
         try:
             with open('./models/feature_names.json') as f:
                 self.feature_names = json.load(f)
@@ -84,15 +65,15 @@ class SentinelExplainer:
         
         print(f"✓ Features prepared: {len(self.feature_names)} features")
         
-        # Create background dataset (stratified sampling)
+        # Enforce stratified background sample for SHAP stability
         print(f"\n[4/4] Creating SHAP background dataset ({background_size} samples)...")
         
-        # Stratified sampling: ensure both fraud and legitimate transactions
+        # Balance fraud and legitimate cases in background sample
         fraud_indices = self.y[self.y == 1].index
         legit_indices = self.y[self.y == 0].index
         
-        # Sample proportionally
-        n_fraud = min(background_size // 10, len(fraud_indices))  # ~10% fraud
+        # Sample proportionally to preserve class signal
+        n_fraud = min(background_size // 10, len(fraud_indices))
         n_legit = background_size - n_fraud
         
         fraud_sample = np.random.choice(fraud_indices, n_fraud, replace=False)
@@ -105,7 +86,7 @@ class SentinelExplainer:
         print(f"  - Fraud samples: {n_fraud}")
         print(f"  - Legitimate samples: {n_legit}")
         
-        # Initialize SHAP explainer
+        # Initialize SHAP explainer with tree-specific settings
         print("\nInitializing SHAP TreeExplainer...")
         self.explainer = shap.TreeExplainer(
             self.model,
@@ -141,17 +122,17 @@ class SentinelExplainer:
         print("GENERATING SHAP SUMMARY PLOT")
         print("=" * 80)
         
-        # Sample data for explanation
+        # Enforce representative sample for explanations
         print(f"\n[1/3] Sampling {sample_size} transactions...")
         sample_indices = np.random.choice(len(self.X), sample_size, replace=False)
         X_sample = self.X.iloc[sample_indices]
         
-        # Calculate SHAP values
+        # Compute SHAP values for feature attribution
         print("\n[2/3] Computing SHAP values (this may take a few minutes)...")
         X_sample_encoded = self._encode_for_shap(X_sample)
         shap_values = self.explainer.shap_values(X_sample_encoded)
         
-        # Generate plot
+        # Emit summary plot for stakeholder review
         print(f"\n[3/3] Generating summary plot (top {max_display} features)...")
         
         plt.figure(figsize=(12, 8))
@@ -169,7 +150,7 @@ class SentinelExplainer:
         
         plt.close()
         
-        # Print top features
+        # Emit top feature drivers for auditability
         print("\n" + "-" * 80)
         print("TOP FEATURES BY MEAN |SHAP VALUE|")
         print("-" * 80)
@@ -212,11 +193,11 @@ class SentinelExplainer:
         print(f"EXPLAINING TRANSACTION {transaction_idx}")
         print("=" * 80)
         
-        # Get transaction data
+        # Load transaction record for explanation
         transaction = self.X.iloc[transaction_idx:transaction_idx+1]
         true_label = self.y.iloc[transaction_idx]
         
-        # Get prediction
+        # Compute prediction for context
         pred_proba = self.model.predict_proba(transaction)[0][1]
         pred_label = int(pred_proba >= 0.5)
         
@@ -225,15 +206,15 @@ class SentinelExplainer:
         print(f"  Predicted: {'FRAUD' if pred_label == 1 else 'LEGITIMATE'}")
         print(f"  Fraud Probability: {pred_proba:.4f}")
         
-        # Calculate SHAP values
+        # Compute SHAP values for the transaction
         print("\nComputing SHAP values...")
         transaction_encoded = self._encode_for_shap(transaction)
         shap_values = self.explainer.shap_values(transaction_encoded)
         
-        # Get base value (expected value)
+        # Capture expected value for attribution baseline
         base_value = self.explainer.expected_value
         
-        # Create explanation object
+        # Build SHAP explanation object
         explanation = shap.Explanation(
             values=shap_values[0],
             base_values=base_value,
@@ -241,7 +222,7 @@ class SentinelExplainer:
             feature_names=self.feature_names
         )
         
-        # Generate plot
+        # Emit explanation plot for interpretability
         print(f"\nGenerating {plot_type} plot...")
         
         if plot_type == 'waterfall':
@@ -249,7 +230,7 @@ class SentinelExplainer:
             shap.waterfall_plot(explanation, max_display=15, show=False)
             
         elif plot_type == 'force':
-            # Force plot requires matplotlib=True for static image
+            # Enforce static rendering for force plot export
             shap.force_plot(
                 base_value,
                 shap_values[0],
@@ -267,7 +248,7 @@ class SentinelExplainer:
         
         plt.close()
         
-        # Get top contributing features
+        # Extract top contributing features for reporting
         feature_contributions = pd.DataFrame({
             'feature': self.feature_names,
             'shap_value': shap_values[0],
@@ -312,13 +293,13 @@ class SentinelExplainer:
         Returns:
             Dictionary with explanation details
         """
-        # Load original data to get TransactionID
+        # Load source data to resolve TransactionID
         df = pd.read_pickle("./data/train_engineered.pkl")
         
         if 'TransactionID' not in df.columns:
             raise ValueError("TransactionID column not found in data")
         
-        # Find index
+        # Resolve index for requested transaction
         idx = df[df['TransactionID'] == transaction_id].index
         
         if len(idx) == 0:
@@ -350,7 +331,7 @@ class SentinelExplainer:
         print(f"BATCH EXPLANATION - {n_samples} TRANSACTIONS")
         print("=" * 80)
         
-        # Sample fraud and legitimate transactions
+        # Sample fraud and legitimate cases for explanation
         fraud_indices = self.y[self.y == 1].index[:n_samples//2]
         legit_indices = self.y[self.y == 0].index[:n_samples//2]
         
@@ -365,7 +346,7 @@ class SentinelExplainer:
             explanation = self.explain_transaction(idx, save_path=save_path)
             explanations.append(explanation)
         
-        # Save explanations as JSON
+        # Persist explanations for reporting
         json_path = f"{output_dir}/batch_explanations.json"
         with open(json_path, 'w') as f:
             json.dump(explanations, f, indent=2)
@@ -382,7 +363,7 @@ class SentinelExplainer:
 def main():
     """Execute SHAP interpretability analysis."""
     
-    # Check if SHAP is installed
+    # Validate SHAP availability before execution
     try:
         import shap
     except ImportError:
@@ -391,26 +372,26 @@ def main():
         print("  pip install shap")
         return
     
-    # Initialize explainer
+    # Initialize explainer with production artifacts
     explainer = SentinelExplainer(
         model_path="./models/sentinel_fraud_model.pkl",
         data_path="./data/train_engineered.pkl",
         background_size=100
     )
     
-    # Generate summary plot
+    # Generate summary plot for feature attributions
     explainer.generate_summary_plot(
         sample_size=1000,
         max_display=20,
         save_path="./reports/shap_summary.png"
     )
     
-    # Explain individual transactions
+    # Generate individual explanations for auditability
     print("\n" + "=" * 80)
     print("INDIVIDUAL TRANSACTION EXPLANATIONS")
     print("=" * 80)
     
-    # Explain a fraud transaction
+    # Emit example fraud explanation for review
     fraud_idx = explainer.y[explainer.y == 1].index[0]
     explainer.explain_transaction(
         fraud_idx,
@@ -418,7 +399,7 @@ def main():
         save_path="./reports/fraud_explanation.png"
     )
     
-    # Explain a legitimate transaction
+    # Emit example legitimate explanation for review
     legit_idx = explainer.y[explainer.y == 0].index[0]
     explainer.explain_transaction(
         legit_idx,
