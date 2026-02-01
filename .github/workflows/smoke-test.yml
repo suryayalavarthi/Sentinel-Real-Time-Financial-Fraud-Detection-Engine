@@ -30,19 +30,19 @@ jobs:
 
       - name: Run Inference Smoke Test
         run: |
-          # Sending the exact keys the API logs are asking for
+          # All inputs converted to numbers to satisfy the float_parsing requirement
           RESPONSE=$(curl -s -X POST http://localhost:8000/predict \
             -H "Content-Type: application/json" \
             -d '{
               "features": {
                 "TransactionAmt": 50.0,
-                "ProductCD": "W",
+                "ProductCD": 1.0,
                 "card1": 1000,
                 "card2": 500,
                 "card3": 150,
-                "card4": "visa",
+                "card4": 1.0,
                 "card5": 226,
-                "card6": "debit",
+                "card6": 1.0,
                 "addr1": 315,
                 "addr2": 87
               }
