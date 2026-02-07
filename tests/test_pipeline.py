@@ -6,18 +6,18 @@ import os
 import sys
 from sklearn.model_selection import TimeSeriesSplit
 
-# Enforce local imports for deterministic test isolation
+# Enforce root as PYTHONPATH for absolute imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-# Enforce explicit imports for test scope
-from feature_engineering import (
+# Absolute imports from src package
+from src.feature_engineering import (
     create_uid,
     engineer_velocity_features,
     engineer_divergence_features,
     engineer_frequency_encoding,
-    run_feature_engineering_pipeline
+    run_feature_engineering_pipeline,
 )
-from data_ingestion import reduce_mem_usage
+from src.data_ingestion import reduce_mem_usage
 
 
 # Enforce golden fixtures for deterministic validation

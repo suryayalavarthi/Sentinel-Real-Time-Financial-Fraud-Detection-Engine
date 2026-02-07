@@ -40,7 +40,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run unit tests
-        run: PYTHONPATH=src pytest tests/ -v --tb=short
+        run: PYTHONPATH=. pytest tests/ -v --tb=short
 
   smoke-test:
     name: Smoke Test
@@ -58,7 +58,7 @@ jobs:
 
       - name: Generate minimal ONNX model for CI
         run: |
-          pip install onnx numpy
+          python -m pip install onnx numpy
           python scripts/generate_ci_model.py
 
       - name: Build and start services
@@ -74,8 +74,8 @@ jobs:
 
       - name: Wait for Gateway readiness
         run: |
-          echo "Waiting for Gateway /health..."
-          timeout 30s bash -c 'until curl -sf http://localhost:8080/health; do sleep 3; done' \
+          echo "Waiting for Gateway /health (200 OK)..."
+          timeout 60s bash -c 'until curl -sf http://localhost:8080/health; do sleep 3; done' \
             || (docker compose -f docker-compose.ci.yml logs && exit 1)
 
       - name: Run inference smoke test
