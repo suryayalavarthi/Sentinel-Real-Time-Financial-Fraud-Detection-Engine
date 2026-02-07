@@ -10,9 +10,7 @@ A production-grade Tier-1 MLOps engine achieving **sub-15ms inference latency** 
 
 **Technical Highlights**: XGBoost-to-ONNX conversion via **Hummingbird** with zero-drift quantization pipeline; NVIDIA Triton serving; FastAPI gateway with gRPC; Prometheus/Grafana observability; SHAP-based Rationale for regulatory explainability; automated drift detection (PSI/KL-Divergence).
 
-![System Architecture](./docs/sentinel-architecture-high-res.png)
 
-*Figure 1: End-to-End MLOps Architecture featuring a containerized FastAPI inference engine and asynchronous monitoring sidecar.*
 
 ### Architecture (Mermaid)
 
