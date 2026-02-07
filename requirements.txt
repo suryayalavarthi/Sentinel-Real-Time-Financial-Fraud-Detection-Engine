@@ -13,6 +13,7 @@ joblib>=1.1.0
 # MLOps & Monitoring
 shap>=0.40.0             # Model interpretability
 pytest>=7.0.0            # Unit testing framework
+pytest-mock>=3.10.0      # Mocking for tests
 scipy>=1.7.0             # Statistical tests for drift detection
 
 # Serving

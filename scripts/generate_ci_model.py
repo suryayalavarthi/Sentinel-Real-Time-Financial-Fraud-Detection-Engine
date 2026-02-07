@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 """
 Generate a minimal ONNX model for CI smoke tests.
-Matches Triton config: input [436] float32 -> output [2] float32 (probabilities).
+Loads feature count from models/feature_names.json to match main.py schema.
 """
+import json
 from pathlib import Path
 
 import numpy as np
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+FEATURES_PATH = BASE_DIR / "models" / "feature_names.json"
 
 
 def main() -> None:
@@ -17,13 +21,17 @@ def main() -> None:
             "onnx required for CI model generation. Run: pip install onnx"
         )
 
-    # Triton config: input float_input [436], output probabilities [2]
+    # Load feature count from same JSON as main.py (single source of truth)
+    with open(FEATURES_PATH, "r", encoding="utf-8") as f:
+        feature_names = json.load(f)
+    n_features = len(feature_names)
+
+    # Triton config: input float_input [n_features], output probabilities [2]
     input_name = "float_input"
     output_name = "probabilities"
-    n_features = 436
     n_classes = 2
 
-    # Input: [batch, 436], Output: [batch, 2]
+    # Input: [batch, n_features], Output: [batch, 2]
     input_tensor = helper.make_tensor_value_info(
         input_name, TensorProto.FLOAT, [-1, n_features]
     )
@@ -64,7 +72,7 @@ def main() -> None:
     model = helper.make_model(graph)
     onnx.checker.check_model(model)
 
-    out_dir = Path(__file__).resolve().parent.parent / "model_repository" / "sentinel_model" / "1"
+    out_dir = BASE_DIR / "model_repository" / "sentinel_model" / "1"
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / "model.onnx"
     onnx.save(model, str(out_path))
