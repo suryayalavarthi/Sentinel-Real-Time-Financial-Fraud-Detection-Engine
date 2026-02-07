@@ -1,0 +1,36 @@
+# Minimal compose for CI: gateway + Triton only (no Prometheus, Grafana, monitoring sidecar)
+services:
+  triton:
+    build:
+      context: .
+      dockerfile: Dockerfile.triton
+    ports:
+      - "8001:8001"
+      - "8000:8000"
+    volumes:
+      - ./model_repository:/models/model_repository:ro
+    restart: unless-stopped
+    command: ["tritonserver", "--model-repository=/models/model_repository", "--allow-gpu-metrics=false"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/v2/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile.gateway
+    ports:
+      - "8080:8000"
+    volumes:
+      - ./models:/app/models:ro
+      - ./ieee-fraud-detection/processed:/app/ieee-fraud-detection/processed:ro
+      - ./ieee-fraud-detection/processed:/app/data/processed:ro
+      - ./logs:/app/logs
+    environment:
+      - TRITON_URL=triton:8001
+    depends_on:
+      triton:
+        condition: service_healthy
+    restart: unless-stopped

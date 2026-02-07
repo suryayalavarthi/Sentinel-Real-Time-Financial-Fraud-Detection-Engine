@@ -8,9 +8,7 @@
 
 A production-grade Tier-1 MLOps engine achieving **sub-15ms inference latency** and 99.9% fraud capture, optimized for real-time financial systems.
 
-**Technical Highlights**: XGBoost-to-ONNX conversion via **Hummingbird** with zero-drift quantization pipeline; NVIDIA Triton serving; FastAPI gateway with gRPC; Prometheus/Grafana observability; SHAP-based Rationale for regulatory explainability; automated drift detection (PSI/KL-Divergence).
-
-
+**Technical Highlights**: XGBoost-to-ONNX conversion via **Hummingbird** with zero-drift quantization pipeline; NVIDIA Triton serving; FastAPI gateway with gRPC; Prometheus/Grafana observability; SHAP-based Rationale for regulatory explainability; automated drift detection (PSI/KL-Divergence)
 
 ### Architecture (Mermaid)
 
@@ -304,6 +302,16 @@ curl -X POST http://localhost:8080/predict \
 
 See `test_request.py` for a full example that loads a real transaction from `train_engineered.pkl`, encodes it, and sends it to the Gateway.
 
+### CI/CD (GitHub Actions)
+
+On every push/PR to `main`, GitHub Actions runs:
+
+- **Build Verification**: Docker images for Triton and Gateway
+- **Unit Tests**: `pytest tests/` (feature engineering, pipeline, memory downcasting)
+- **Smoke Test**: Minimal ONNX model generated in CI; gateway + Triton started; `/predict` exercised with a minimal payload
+
+Workflow: `.github/workflows/smoke-test.yml`
+
 ### Quantization Validation
 
 The `quantize/quantize.py` pipeline performs an **automated parity check** between XGBoost and ONNX outputs before deployment. `validate_outputs_match` compares per-sample probabilities on a stratified sample and asserts `np.allclose(pred_xgb, pred_onnx, rtol=1e-3, atol=1e-5)` to ensure `max_abs_diff < 1e-6` for production models.
@@ -386,7 +394,7 @@ Synced with `requirements.txt`:
 - [x] **Tier-1 Triton Stack**: ONNX serving via Hummingbird/onnxmltools, gRPC gateway, Prometheus/Grafana
 
 **In Progress:**
-- [ ] **CI/CD Integration**: Automated smoke tests and build verification via GitHub Actions
+- [x] **CI/CD Integration**: Automated smoke tests and build verification via GitHub Actions
 
 **Planned:**
 - [ ] **Parallel Processing**: Use `dask` for multi-core scalability
