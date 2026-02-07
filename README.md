@@ -11,7 +11,62 @@ A production-grade Tier-1 MLOps engine achieving **sub-15ms inference latency** 
 **Technical Highlights**: XGBoost-to-ONNX conversion via **Hummingbird** with zero-drift quantization pipeline; NVIDIA Triton serving; FastAPI gateway with gRPC; Prometheus/Grafana observability; SHAP-based Rationale for regulatory explainability; automated drift detection (PSI/KL-Divergence).
 
 ![System Architecture](./docs/sentinel-architecture-high-res.png)
+graph TD
+    %% Input Layer
+    User([Financial Transaction Stream]) --> Gateway
 
+    %% Core Inference Stack
+    subgraph Docker_Compose [Docker Compose Environment]
+        subgraph Gateway_Service [FastAPI Gateway]
+            Gateway[API Entry Point]
+            Pydantic[Schema Validation]
+            SHAP[SHAP Rationale Engine]
+            Prom_Client[Prometheus Client]
+            
+            Gateway --> Pydantic
+            Pydantic --> SHAP
+        end
+
+        subgraph Triton_Service [Triton Inference Server]
+            Triton[NVIDIA Triton]
+            
+            subgraph Model_Repo [Model Repository]
+                ONNX[model.onnx]
+                Config[config.pbtxt]
+                HB[[Hummingbird Tensor Graph]]
+                
+                Triton --> HB
+                HB -.-> ONNX
+            end
+        end
+
+        subgraph Monitoring_Service [Observability Stack]
+            Prom[(Prometheus TSDB)]
+            Grafana[Grafana Dashboards]
+            Sidecar[Monitoring Sidecar]
+            
+            Prom_Client -->|Scrape /metrics| Prom
+            Prom --> Grafana
+            Sidecar -->|PSI / KL-Div| Prom
+        end
+    end
+
+    %% Quantization Pipeline
+    subgraph Pipeline [Quantization Pipeline]
+        XGB[XGBoost Booster] -->|quantize.py| HB_Conv[Hummingbird Converter]
+        HB_Conv -->|Parity Check| Parity{diff < 1e-6}
+        Parity -->|Pass| ONNX
+    end
+
+    %% Communication
+    Gateway -->|gRPC / sub-15ms| Triton
+    Sidecar -.->|Async Drift Check| Gateway
+
+    %% Styling
+    style Gateway fill:#005571,color:#fff
+    style Triton fill:#76b900,color:#000
+    style HB fill:#f9f,stroke-dasharray: 5 5
+    style Sidecar fill:#0db7ed,color:#fff
 *Figure 1: End-to-End MLOps Architecture featuring a containerized FastAPI inference engine and asynchronous monitoring sidecar.*
 
 ## System Architecture: 5-Service Docker Stack
