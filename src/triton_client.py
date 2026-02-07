@@ -1,16 +1,13 @@
 """
 Triton inference client with gRPC primary and HTTP fallback.
 Uses lazy loading for tritonclient to avoid import crashes in test environments.
+ZERO top-level tritonclient imports.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Union
+from typing import Any, Union
 
 import numpy as np
-
-if TYPE_CHECKING:
-    import tritonclient.grpc as grpc_client
-    import tritonclient.http as http_client
 
 
 def _grpc_available() -> bool:
@@ -47,8 +44,8 @@ class TritonClient:
         self.model_version = model_version
         self.input_name = input_name
         self.output_name = output_name
-        self._grpc_client: Union["grpc_client.InferenceServerClient", None] = None
-        self._http_client: Union["http_client.InferenceServerClient", None] = None
+        self._grpc_client: Any = None
+        self._http_client: Any = None
         self._use_grpc = True
 
     def _get_grpc_client(self):
