@@ -1,14 +1,66 @@
-version: "3.9"
-
 services:
-  api:
-    build: .
+  triton:
+    build:
+      context: .
+      dockerfile: Dockerfile.triton
+    # REMOVED: deploy/reservations/nvidia block as it is incompatible with M2 Mac
     ports:
+      - "8001:8001"
       - "8000:8000"
     volumes:
+      - ./model_repository:/models/model_repository:ro
+    restart: unless-stopped
+    # Triton will automatically use CPU when GPU is not present
+    command: ["tritonserver", "--model-repository=/models/model_repository", "--allow-gpu-metrics=false"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/v2/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile.gateway
+    ports:
+      - "8080:8000"
+    volumes:
       - ./models:/app/models:ro
-      - ./data/processed:/app/data/processed:ro
+      - ./ieee-fraud-detection/processed:/app/ieee-fraud-detection/processed:ro
+      - ./ieee-fraud-detection/processed:/app/data/processed:ro
       - ./logs:/app/logs
+    environment:
+      - TRITON_URL=triton:8001
+    depends_on:
+      triton:
+        condition: service_healthy
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.47.0
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-lifecycle"
+    ports:
+      - "9090:9090"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:10.1.0
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_HTTP_PORT=3000
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
     restart: unless-stopped
 
   monitoring:
@@ -16,6 +68,10 @@ services:
     command: ["sh", "-c", "while true; do python scripts/monitoring.py; sleep 3600; done"]
     volumes:
       - ./models:/app/models:ro
-      - ./data/processed:/app/data/processed:ro
+      - ./ieee-fraud-detection/processed:/app/data/processed:ro
       - ./logs:/app/logs
     restart: unless-stopped
+
+volumes:
+  prometheus_data:
+  grafana_data:

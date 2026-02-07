@@ -23,10 +23,17 @@ coverage.xml
 
 # OS files
 .DS_Store
+.ds_store
+
+# Binary data and models (commit code/config only)
+*.pkl
+*.onnx
+*.plan
 
 # Raw data (large files)
 data/raw/
 data/**/*.csv
+ieee-fraud-detection/
 
 # Logs
 logs/*.json

@@ -1,0 +1,10 @@
+{
+  "model_version": "1.0.0",
+  "training_date": "2026-01-01T00:00:00",
+  "n_samples": 590540,
+  "n_features": 436,
+  "fraud_rate": 0.035,
+  "avg_roc_auc": 0.88,
+  "avg_pr_auc": 0.48,
+  "estimated_roi": 1200.0
+}

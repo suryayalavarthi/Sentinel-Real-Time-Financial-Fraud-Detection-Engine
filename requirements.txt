@@ -19,6 +19,17 @@ scipy>=1.7.0             # Statistical tests for drift detection
 fastapi>=0.110.0
 uvicorn>=0.27.0
 
+# Triton & Quantization
+tritonclient[grpc,http]>=2.34.0
+hummingbird-ml==0.4.12   # Primary XGBoost->ONNX (fixed version)
+onnxscript>=0.1.0        # Required by Hummingbird ONNX backend
+onnxmltools>=1.11.0            # Fallback if Hummingbird fails
+onnx>=1.14.0
+onnxruntime>=1.15.0
+
+# Observability
+prometheus-client>=0.19.0
+
 # Visualization (Optional but recommended)
 matplotlib>=3.4.0        # Plotting
 seaborn>=0.11.0          # Statistical visualization
