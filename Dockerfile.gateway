@@ -7,13 +7,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 && rm 
 
 WORKDIR /app
 
-COPY requirements.txt /app/
+COPY --link requirements.txt /app/
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY main.py /app/
-COPY src/ /app/src/
-COPY models/ /app/models/
-COPY monitoring/ /app/monitoring/
+COPY --link main.py /app/
+COPY --link src/ /app/src/
+COPY --link models/ /app/models/
+COPY --link monitoring/ /app/monitoring/
 
 EXPOSE 8000
 

@@ -5,7 +5,7 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-COPY model_repository/ /models/model_repository/
+COPY --link model_repository/ /models/model_repository/
 
 ENV TRITON_MODEL_REPOSITORY=/models/model_repository
 
