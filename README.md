@@ -10,6 +10,14 @@ A production-grade Tier-1 MLOps engine achieving **sub-15ms inference latency** 
 
 **Technical Highlights**: XGBoost-to-ONNX conversion via **Hummingbird** with zero-drift quantization pipeline; NVIDIA Triton serving; FastAPI gateway with gRPC; Prometheus/Grafana observability; SHAP-based Rationale for regulatory explainability; automated drift detection (PSI/KL-Divergence)
 
+## 🏗️ Production Engineering & CI/CD
+Sentinel is backed by a battle-tested CI/CD pipeline that ensures high-fidelity deployments:
+
+- **Infrastructure-as-Code**: Orchestrated a 5-service stack (NVIDIA Triton, FastAPI, Redis, Prometheus, Grafana).
+- **Runner Hardening**: Optimized GitHub Runners by implementing aggressive workspace pruning (~30GB reclaimed) and sequential Docker builds to manage high-resource Triton images.
+- **Model Ops**: Resolved complex ONNX IR versioning and CUDA library dependencies to maintain a 100% \"Healthy\" service status during automated smoke tests.
+- **Efficiency**: Utilized multi-stage builds and context isolation to minimize deployment footprints.
+
 ### Architecture (Mermaid)
 
 ```mermaid
@@ -51,6 +59,15 @@ flowchart TD
 ```
 
 *Request flow: Client → Gateway (validation) → Triton (inference) → Gateway → SHAP (High Risk) → Response. Observability: Prometheus scrapes Gateway; Monitoring computes PSI/KL vs reference; Grafana dashboards.*
+
+#### High-Level Inference Flow
+
+```mermaid
+flowchart LR
+    Client[Client] --> Gateway[FastAPI Gateway]
+    Gateway -->|"gRPC"| Triton[Triton Inference]
+    Triton --> Prometheus[Prometheus Monitoring]
+```
 
 ## System Architecture: 5-Service Docker Stack
 
