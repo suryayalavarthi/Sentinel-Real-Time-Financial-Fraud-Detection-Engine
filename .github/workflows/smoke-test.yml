@@ -16,8 +16,10 @@ jobs:
       - name: Free disk space
         continue-on-error: true
         run: |
-          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc \
-            /usr/share/swift /usr/local/share/powershell /usr/local/lib/node_modules
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /usr/share/swift /usr/local/share/powershell /usr/local/lib/node_modules \
+            /usr/local/share/boost /usr/local/openjdk11
+          docker image prune -a -f
           df -h /
 
       - name: Set up Docker Buildx
@@ -57,8 +59,10 @@ jobs:
       - name: Free disk space
         continue-on-error: true
         run: |
-          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc \
-            /usr/share/swift /usr/local/share/powershell /usr/local/lib/node_modules
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /usr/share/swift /usr/local/share/powershell /usr/local/lib/node_modules \
+            /usr/local/share/boost /usr/local/openjdk11
+          docker image prune -a -f
           df -h /
 
       - name: Set up Docker Buildx
