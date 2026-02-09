@@ -232,8 +232,8 @@ def test_memory_downcasting_float64_to_float32():
     assert optimized_df['col_int64'].dtype in [np.int8, np.int16, np.int32, np.uint8, np.uint16, np.uint32], \
         f"int64 should be downcasted, got {optimized_df['col_int64'].dtype}"
     
-    assert optimized_df['col_object'].dtype in [object, 'category'], \
-        "Object columns should remain object or be converted to category"
+    assert pd.api.types.is_string_dtype(optimized_df['col_object']) or optimized_df['col_object'].dtype == 'category', \
+        "Object columns should remain string/object or be converted to category"
     
     print("✓ Test Case 3 PASSED: Memory downcasting validated")
 
@@ -280,7 +280,7 @@ def test_uid_creation(golden_dataset):
     assert 'uid' in df.columns, "UID column should be created"
     
     # Enforce UID type for grouping stability
-    assert df['uid'].dtype == object, "UID should be string type"
+    assert pd.api.types.is_string_dtype(df['uid']), "UID should be string type"
     
     # Enforce UID format consistency
     sample_row = df.iloc[0]

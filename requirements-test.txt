@@ -1,0 +1,7 @@
+# Minimal dependencies for running unit tests in CI.
+# Heavy packages (tritonclient, onnx, shap, xgboost) are NOT needed here --
+# tests/conftest.py injects fake tritonclient modules via sys.modules.
+pytest>=7.0.0
+pandas>=1.3.0
+numpy>=1.21.0
+scikit-learn>=1.0.0

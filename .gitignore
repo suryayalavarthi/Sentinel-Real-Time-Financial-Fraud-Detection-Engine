@@ -37,3 +37,6 @@ ieee-fraud-detection/
 
 # Logs
 logs/*.json
+
+# Build/packaging artifacts
+*.egg-info/
