@@ -103,7 +103,7 @@ jobs:
 
       - name: Run inference smoke test
         run: |
-          PAYLOAD=$(python generate_test_payload.py)
+          PAYLOAD=$(python scripts/generate_test_payload.py)
           RESPONSE=$(curl -s -X POST http://localhost:8080/predict \
             -H "Content-Type: application/json" \
             -d "$PAYLOAD")

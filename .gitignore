@@ -29,10 +29,10 @@ coverage.xml
 *.pkl
 *.onnx
 *.plan
+*.joblib
 
-# Raw data (large files)
-data/raw/
-data/**/*.csv
+# Data directories (large files, never commit)
+data/
 ieee-fraud-detection/
 
 # Logs

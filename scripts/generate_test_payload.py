@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).resolve().parent.parent
 FEATURES_PATH = BASE_DIR / "models" / "feature_names.json"
 
 
