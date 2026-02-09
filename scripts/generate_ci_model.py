@@ -69,7 +69,13 @@ def main() -> None:
         initializer=[w_init, b_init],
     )
 
-    model = helper.make_model(graph)
+    # Triton 23.10 ships ONNX Runtime 1.16: IR version <= 9, opset <= 19.
+    # Latest onnx pip package defaults to IR 11 / opset 23, so pin both.
+    model = helper.make_model(
+        graph,
+        opset_imports=[helper.make_opsetid("", 17)],
+    )
+    model.ir_version = 8
     onnx.checker.check_model(model)
 
     out_dir = BASE_DIR / "model_repository" / "sentinel_model" / "1"

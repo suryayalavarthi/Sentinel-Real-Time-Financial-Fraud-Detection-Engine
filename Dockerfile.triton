@@ -1,14 +1,9 @@
-# Stage 1: extract only the onnxruntime backend from the full image
-FROM nvcr.io/nvidia/tritonserver:23.10-py3 AS backend-src
-
-# Stage 2: minimal Triton server with just what we need
-FROM nvcr.io/nvidia/tritonserver:23.10-py3-min
+# Full Triton image — the onnxruntime backend links against libcudart and
+# libcupti at the .so level, so the -min image cannot satisfy those deps
+# without also copying CUDA (which defeats the size savings).
+FROM nvcr.io/nvidia/tritonserver:23.10-py3
 
 ENV PYTHONUNBUFFERED=1
-
-RUN apt-get update && apt-get install -y --no-install-recommends curl libgomp1 && rm -rf /var/lib/apt/lists/*
-
-COPY --from=backend-src /opt/tritonserver/backends/onnxruntime /opt/tritonserver/backends/onnxruntime
 
 WORKDIR /app
 
